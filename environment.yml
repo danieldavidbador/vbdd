@@ -1,0 +1,9 @@
+name: vbdd
+dependencies:
+  - pandas
+  - pytorch
+  - scikit-learn
+  - torchvision
+  - tqdm
+  - xarray
+  - matplotlib
