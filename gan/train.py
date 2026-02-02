@@ -68,8 +68,6 @@ class Discriminator(torch.nn.Module):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Train a GAN model for data augmentation.")
   
-  parser.add_argument("--device", type=str, default="cpu", help="The device to use for model training and inference.", choices=["cpu", "mps", "cuda"])
-
   parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"], help="Directory to save trained model weights.")
   parser.add_argument("--train-data-dir", type=str, default=os.environ["SM_CHANNEL_TRAIN"], help="Directory for the training data.")
   parser.add_argument("--output-data-dir", type=str, default=os.environ["SM_OUTPUT_DATA_DIR"], help="Directory to save trained model weights.")
@@ -80,8 +78,6 @@ if __name__ == "__main__":
   parser.add_argument("--learning-rate", type=float, default=1e-1, help="Learning rate for the training optimizer.")
 
   args = parser.parse_args()
-
-  torch.set_default_device(args.device)
 
   generator = Generator()
   discriminator = Discriminator()

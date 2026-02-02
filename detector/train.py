@@ -75,8 +75,6 @@ class Detector(torch.nn.Module):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Train a vibration-based damage detection model.")
-  
-  parser.add_argument("--device", type=str, default="cpu", help="The device to use for model training and inference.", choices=["cpu", "mps", "cuda"])
 
   parser.add_argument("--model-dir", type=str, default=os.environ["SM_MODEL_DIR"], help="Directory to save trained model weights.")
   parser.add_argument("--train-data-dir", type=str, default=os.environ["SM_CHANNEL_TRAIN"], help="Directory for the training data.")
@@ -90,8 +88,6 @@ if __name__ == "__main__":
 
   args = parser.parse_args()
   
-  torch.set_default_device(args.device)
-
   detector = Detector()
 
   train_features = pandas.read_csv(f"{args.train_data_dir}/features.csv")
