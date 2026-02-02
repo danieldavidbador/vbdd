@@ -1,13 +1,16 @@
 from sagemaker import get_execution_role
 
-from sagemaker.workflow.steps import ProcessingStep, TrainingStep, ModelStep
+from sagemaker.workflow.steps import ProcessingStep, TrainingStep, CreateModelStep
 from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.parameters import ParameterString
 from sagemaker.workflow.pipeline_context import PipelineSession
 
-from sagemaker.model import Model
-from sagemaker.training import PyTorch, TrainingInput
-from sagemaker.processing import SKLearnProcessor, ProcessingInput, ProcessingOutput
+from sagemaker.estimator import Estimator
+from sagemaker.inputs import TrainingInput
+from sagemaker.pytorch import PyTorchModel
+
+from sagemaker.sklearn.processing import SKLearnProcessor
+from sagemaker.processing import ProcessingInput, ProcessingOutput
 
 session = PipelineSession()
 
@@ -42,7 +45,7 @@ split_dataset = ProcessingStep(
     )
 )
 
-gan_estimator = PyTorch(
+gan_estimator = Estimator(
     entry_point="gan/train.py",
     role=get_execution_role(),
     framework_version="1.12.0",
@@ -70,13 +73,13 @@ train_gan_model = TrainingStep(
     )
 )
 
-gan_model = Model(
+gan_model = PyTorchModel(
     model_data=train_gan_model.properties.ModelArtifacts.S3ModelArtifacts,
     role=get_execution_role(),
     sagemaker_session=session,
 )
 
-create_gan_model = ModelStep(
+create_gan_model = CreateModelStep(
     name="CreateGanModel",
     step_args=gan_model.create(
         instance_type="ml.m5.large",
@@ -104,7 +107,7 @@ augment_dataset = ProcessingStep(
     )
 )
 
-detector_estimator = PyTorch(
+detector_estimator = Estimator(
     entry_point="detector/train.py",
     role=get_execution_role(),
     framework_version="1.12.0",
@@ -136,13 +139,13 @@ train_detector_model = TrainingStep(
     )
 )
 
-detector_model = Model(
+detector_model = PyTorchModel(
     model_data=train_detector_model.properties.ModelArtifacts.S3ModelArtifacts,
     role=get_execution_role(),
     sagemaker_session=session,
 )
 
-create_detector_model = ModelStep(
+create_detector_model = CreateModelStep(
     name="CreateDetectorModel",
     step_args=detector_model.create(
         instance_type="ml.m5.large",
