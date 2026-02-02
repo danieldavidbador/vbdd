@@ -5,9 +5,8 @@ from sagemaker.workflow.pipeline import Pipeline
 from sagemaker.workflow.parameters import ParameterString
 from sagemaker.workflow.pipeline_context import PipelineSession
 
-from sagemaker.estimator import Estimator
 from sagemaker.inputs import TrainingInput
-from sagemaker.pytorch import PyTorchModel
+from sagemaker.pytorch import PyTorch, PyTorchModel
 
 from sagemaker.sklearn.processing import SKLearnProcessor
 from sagemaker.processing import ProcessingInput, ProcessingOutput
@@ -45,7 +44,7 @@ split_dataset = ProcessingStep(
     )
 )
 
-gan_estimator = Estimator(
+gan_estimator = PyTorch(
     entry_point="gan/train.py",
     role=get_execution_role(),
     framework_version="1.12.0",
@@ -107,7 +106,7 @@ augment_dataset = ProcessingStep(
     )
 )
 
-detector_estimator = Estimator(
+detector_estimator = PyTorch(
     entry_point="detector/train.py",
     role=get_execution_role(),
     framework_version="1.12.0",
