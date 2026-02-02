@@ -1,7 +1,12 @@
+import sagemaker
+
 from sagemaker import get_execution_role
 
-from sagemaker.workflow.steps import ProcessingStep, TrainingStep, CreateModelStep
+from sagemaker.image_uris import retrieve
+
+from sagemaker.workflow.steps import ProcessingStep, TrainingStep
 from sagemaker.workflow.pipeline import Pipeline
+from sagemaker.workflow.model_step import ModelStep
 from sagemaker.workflow.parameters import ParameterString
 from sagemaker.workflow.pipeline_context import PipelineSession
 
@@ -13,8 +18,28 @@ from sagemaker.processing import ProcessingInput, ProcessingOutput
 
 session = PipelineSession()
 
-dataset_path = ParameterString(
-    name="DatasetS3Path",
+region = session.boto_region_name
+
+training_image_uri = retrieve(
+    framework="pytorch",
+    region=region,
+    version="2.6",
+    py_version="py312",
+    instance_type="ml.g4dn.xlarge",
+    image_scope="training"
+)
+
+inference_image_uri = retrieve(
+    framework="pytorch",
+    region=region,
+    version="2.6",
+    py_version="py312",
+    instance_type="ml.g4dn.xlarge",
+    image_scope="inference",
+)
+
+input_data = ParameterString(
+    name="InputData",
     default_value="s3://my-bucket/my-dataset/data.csv"
 )
 
@@ -32,7 +57,7 @@ split_dataset = ProcessingStep(
         code="dataset/split.py",
         inputs=[
             ProcessingInput(
-                source=dataset_path,
+                source=input_data,
                 destination="/opt/ml/processing/input"
             )
         ],
@@ -47,8 +72,7 @@ split_dataset = ProcessingStep(
 gan_estimator = PyTorch(
     entry_point="gan/train.py",
     role=get_execution_role(),
-    framework_version="1.12.0",
-    py_version="py38",
+    image_uri=training_image_uri,
     instance_count=1,
     instance_type="ml.g4dn.xlarge",
     hyperparameters={
@@ -75,14 +99,26 @@ train_gan_model = TrainingStep(
 gan_model = PyTorchModel(
     model_data=train_gan_model.properties.ModelArtifacts.S3ModelArtifacts,
     role=get_execution_role(),
+    image_uri=inference_image_uri,
     sagemaker_session=session,
 )
 
-create_gan_model = CreateModelStep(
+create_gan_model = ModelStep(
     name="CreateGanModel",
     step_args=gan_model.create(
         instance_type="ml.m5.large",
         accelerator_type="ml.eia1.medium"
+    )
+)
+
+register_gan_model = ModelStep(
+    name="RegisterGanModel",
+    step_args=gan_model.register(
+        content_types=["text/csv"],
+        response_types=["text/csv"],
+        inference_instances=["ml.t2.medium", "ml.m5.large"],
+        transform_instances=["ml.m5.large"],
+        model_package_name="Vibration Based GAN Model",
     )
 )
 
@@ -96,7 +132,7 @@ augment_dataset = ProcessingStep(
                 destination="/opt/ml/processing/input/data"
             ),
             ProcessingInput(
-                source=create_gan_model.properties.ModelArtifacts.S3ModelArtifacts,
+                source=train_gan_model.properties.ModelArtifacts.S3ModelArtifacts,
                 destination="/opt/ml/processing/input/model"
             ),
         ],
@@ -109,8 +145,7 @@ augment_dataset = ProcessingStep(
 detector_estimator = PyTorch(
     entry_point="detector/train.py",
     role=get_execution_role(),
-    framework_version="1.12.0",
-    py_version="py38",
+    image_uri=training_image_uri,
     instance_count=1,
     instance_type="ml.g4dn.xlarge",
     hyperparameters={
@@ -141,10 +176,11 @@ train_detector_model = TrainingStep(
 detector_model = PyTorchModel(
     model_data=train_detector_model.properties.ModelArtifacts.S3ModelArtifacts,
     role=get_execution_role(),
+    image_uri=inference_image_uri,
     sagemaker_session=session,
 )
 
-create_detector_model = CreateModelStep(
+create_detector_model = ModelStep(
     name="CreateDetectorModel",
     step_args=detector_model.create(
         instance_type="ml.m5.large",
@@ -152,10 +188,29 @@ create_detector_model = CreateModelStep(
     )
 )
 
+register_detector_model = ModelStep(
+    name="RegisterDetectorModel",
+    step_args=detector_model.register(
+        content_types=["text/csv"],
+        response_types=["text/csv"],
+        inference_instances=["ml.t2.medium", "ml.m5.large"],
+        transform_instances=["ml.m5.large"],
+        model_package_name="Vibration Based Damage Detection Model",
+    )
+)
+
 pipeline = Pipeline(
     name = "VibrationBasedDamageDetectionModelPipeline",
-    parameters = [dataset_path],
+    parameters = [input_data],
     steps = [split_dataset, train_gan_model, create_gan_model, augment_dataset, train_detector_model, create_detector_model],
 )
 
 pipeline.upsert(role_arn=get_execution_role())
+
+execution = pipeline.start(parameters=dict(InputData="s3://amazon-sagemaker-753565189289-us-east-1-bsrdcs7wf2k8iv/shared/data.csv"))
+
+execution.describe()
+
+execution.wait()
+
+execution.list_steps()
