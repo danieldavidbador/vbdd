@@ -202,7 +202,16 @@ register_detector_model = ModelStep(
 pipeline = Pipeline(
     name = "VibrationBasedDamageDetectionModelPipeline",
     parameters = [input_data],
-    steps = [split_dataset, train_gan_model, create_gan_model, augment_dataset, train_detector_model, create_detector_model],
+    steps = [
+        split_dataset,
+        train_gan_model,
+        create_gan_model,
+        register_gan_model,
+        augment_dataset,
+        train_detector_model,
+        create_detector_model,
+        register_detector_model
+    ],
 )
 
 pipeline.upsert(role_arn=get_execution_role())
